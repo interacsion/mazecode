@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, ops::RangeInclusive};
+use std::{collections::BTreeMap, iter, ops::RangeInclusive};
 
 use quote::quote;
 use serde::Deserialize;
@@ -33,16 +33,6 @@ struct ErrorCorrectionBlock {
 }
 
 pub fn generate(version_info: &VersionInfo) -> File {
-    let version_group = quote! {
-        pub struct VersionGroup {
-            pub range: std::range::RangeInclusive<super::Version>,
-            pub numeric_count_indicator_length: usize,
-            pub alphanumeric_count_indicator_length: usize,
-            pub byte_count_indicator_length: usize,
-            pub kanji_count_indicator_length: usize,
-        }
-    };
-
     let version_groups_len = version_info.groups.len();
 
     let version_groups = version_info.groups.iter().map(|group| {
@@ -70,13 +60,55 @@ pub fn generate(version_info: &VersionInfo) -> File {
 
     let versions_len = version_info.versions.len();
 
-    let version_data_codewords = version_info.versions.iter().enumerate().map(|(index, (number, version))| {
-        assert!(*number as usize == index + 1);
-        version.data_codewords
-    });
+    let version_data_codewords =
+        version_info
+            .versions
+            .iter()
+            .enumerate()
+            .map(|(index, (number, version))| {
+                assert!(*number == index + 1);
+                version.data_codewords
+            });
+
+    let version_error_correction_blocks =
+        version_info
+            .versions
+            .iter()
+            .enumerate()
+            .map(|(index, (number, version))| {
+                assert!(*number == index + 1);
+
+                let blocks = version.error_correction_blocks.iter().flat_map(|block| {
+                    let ErrorCorrectionBlock {
+                        count,
+                        total_codewords,
+                        data_codewords,
+                    } = block;
+
+                    iter::repeat_n(
+                        quote! {
+                            ErrorCorrectionBlock {
+                                total_codewords: #total_codewords,
+                                data_codewords: #data_codewords
+                            }
+                        },
+                        *count,
+                    )
+                });
+
+                quote! {
+                    &[ #(#blocks),* ]
+                }
+            });
 
     parse_quote! {
-        #version_group
+        pub struct VersionGroup {
+            pub range: std::range::RangeInclusive<super::Version>,
+            pub numeric_count_indicator_length: usize,
+            pub alphanumeric_count_indicator_length: usize,
+            pub byte_count_indicator_length: usize,
+            pub kanji_count_indicator_length: usize,
+        }
 
         pub static VERSION_GROUPS: [VersionGroup; #version_groups_len] = [
             #(#version_groups),*
@@ -84,6 +116,15 @@ pub fn generate(version_info: &VersionInfo) -> File {
 
         pub static VERSION_DATA_CODEWORDS: [usize; #versions_len] = [
             #(#version_data_codewords),*
+        ];
+
+        pub struct ErrorCorrectionBlock {
+            pub total_codewords: usize,
+            pub data_codewords: usize,
+        }
+
+        pub static VERSION_ERROR_CORRECTION_BLOCKS: [&[ErrorCorrectionBlock]; #versions_len] = [
+            #(#version_error_correction_blocks),*
         ];
     }
 }

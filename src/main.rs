@@ -9,14 +9,18 @@ use bitvec::{
     view::{AsBits, BitView},
 };
 
-use crate::versions::{VERSION_GROUPS, Version, find_version_with_bit_capacity};
+use crate::versions::{
+    Version, find_version_with_bit_capacity,
+    get_version_error_correction_blocks, version_groups,
+};
 
+mod gf;
 mod versions;
 
 fn encode_data(data: &[u8]) -> Result<(Vec<u8>, Version)> {
     // TODO: mix different modes to optimize size
 
-    for version_group in &VERSION_GROUPS {
+    for version_group in version_groups() {
         let data_len = data.len();
         let data_len_bits = data_len.view_bits::<Msb0>();
 
@@ -27,8 +31,8 @@ fn encode_data(data: &[u8]) -> Result<(Vec<u8>, Version)> {
 
         let data_len_bits =
             &data_len_bits[(data_len_bits.len() - version_group.byte_count_indicator_length)..];
-        debug_assert!(data_len_bits.len() == version_group.byte_count_indicator_length);
-        debug_assert!(data_len_bits.load_be::<usize>() == data_len);
+        debug_assert_eq!(data_len_bits.len(), version_group.byte_count_indicator_length);
+        debug_assert_eq!(data_len_bits.load_be::<usize>(), data_len);
 
         let mut result: BitVec<u8, Msb0> = BitVec::new();
         result.extend_from_bitslice(bits![0, 1, 0, 0]); // byte mode indicator
@@ -44,7 +48,7 @@ fn encode_data(data: &[u8]) -> Result<(Vec<u8>, Version)> {
         let terminator_len = min(4, bit_capacity - result.len());
         result.resize(result.len() + terminator_len, false);
 
-        debug_assert!(result.len() % 8 == 0);
+        debug_assert_eq!(result.len() % 8, 0);
 
         loop {
             if result.len() == bit_capacity {
@@ -66,45 +70,18 @@ fn encode_data(data: &[u8]) -> Result<(Vec<u8>, Version)> {
     bail!("input data is too long")
 }
 
-fn gf256_add(x: u8, y: u8) -> u8 {
-    x ^ y
-}
-
-fn gf256_mul(x: u8, y: u8) -> u8 {
-    todo!()
-}
-
-/// Calculates the Error Correction Codes (ECC) for given message data.
-///
-/// They are the remainder of dividing the message data interpreted as polynomial by some monic generator polynomial.
-///
-/// This is implemented via long division.
-fn calculate_error_correction_codes(data: &[u8], count: usize, g: &[u8]) -> Vec<u8> {
-    // The coefficients of the remainder
-    let mut remainder = vec![0; count];
-
-    for &byte in data {
-        // We need a factor that cancels out the leading term.
-        // Since we're in a Galois Field and g is monic, that factor is just the leading coefficient.
-        let factor = gf256_add(byte, remainder[0]);
-
-        // Shift all coefficients left. Equivalent to multiplying the remainder by x.
-        for i in 0..(count - 1) {
-            remainder[i] = remainder[i + 1];
-        }
-        remainder[count - 1] = 0;
-
-        // Add the scaled polynomial to the remainder. This cancels out the leading term.
-        for i in 0..count {
-            remainder[i] = gf256_add(remainder[i], gf256_mul(factor, g[i + 1]))
-        }
-    }
-
-    remainder
-}
-
 fn main() -> Result<()> {
     let (data, version) = encode_data(b"Hello, World!")?;
+
+    dbg!(version, &data);
+
+    let mut data = data.into_iter();
+
+    for block in get_version_error_correction_blocks(version) {
+        let error_correction_block_count = block.total_codewords - block.data_codewords;
+
+        todo!()
+    }
 
     Ok(())
 }
