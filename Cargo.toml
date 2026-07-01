@@ -1,0 +1,16 @@
+[package]
+name = "mazecode"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+bitvec = "1"
+clap = "4"
+image = { version =  "0.25", features = ["jpeg", "png", "webp", "rayon"], default-features = false }
+
+[build-dependencies]
+mazecode-codegen = { path = "codegen" }
+anyhow = "1"
+prettyplease = "0.2"
+ron = "0.12"

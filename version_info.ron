@@ -1,0 +1,86 @@
+(
+    groups: [
+        (
+            range: 1..=9,
+            numeric_count_indicator_length: 10,
+            alphanumeric_count_indicator_length: 9,
+            byte_count_indicator_length: 8,
+            kanji_count_indicator_length: 8,
+        ),
+        (
+            range: 10..=26,
+            numeric_count_indicator_length: 12,
+            alphanumeric_count_indicator_length: 11,
+            byte_count_indicator_length: 16,
+            kanji_count_indicator_length: 10,
+        ),
+        (
+            range: 27..=40,
+            numeric_count_indicator_length: 14,
+            alphanumeric_count_indicator_length: 13,
+            byte_count_indicator_length: 16,
+            kanji_count_indicator_length: 12,
+        ),
+    ],
+    // TODO: add rest of versions
+    versions: {
+        1: (
+            data_codewords: 9,
+            error_correction_blocks: [
+                (count: 1, total_codewords: 26, data_codewords: 9),
+            ],
+        ),
+        2: (
+            data_codewords: 16,
+            error_correction_blocks: [
+                (count: 1, total_codewords: 44, data_codewords: 16),
+            ],
+        ),
+        3: (
+            data_codewords: 26,
+            error_correction_blocks: [
+                (count: 2, total_codewords: 35, data_codewords: 13),
+            ],
+        ),
+        4: (
+            data_codewords: 36,
+            error_correction_blocks: [
+                (count: 4, total_codewords: 25, data_codewords: 9),
+            ],
+        ),
+        5: (
+            data_codewords: 46,
+            error_correction_blocks: [
+                (count: 2, total_codewords: 33, data_codewords: 11),
+                (count: 2, total_codewords: 34, data_codewords: 12),
+            ],
+        ),
+        6: (
+            data_codewords: 60,
+            error_correction_blocks: [
+                (count: 4, total_codewords: 43, data_codewords: 15),
+            ],
+        ),
+        7: (
+            data_codewords: 66,
+            error_correction_blocks: [
+                (count: 4, total_codewords: 39, data_codewords: 13),
+                (count: 1, total_codewords: 40, data_codewords: 14),
+            ],
+        ),
+        8: (
+            data_codewords: 86,
+            error_correction_blocks: [
+                (count: 4, total_codewords: 40, data_codewords: 14),
+                (count: 2, total_codewords: 41, data_codewords: 15),
+            ],
+        ),
+        9: (
+            data_codewords: 100,
+            error_correction_blocks: [
+                (count: 4, total_codewords: 36, data_codewords: 12),
+                (count: 4, total_codewords: 37, data_codewords: 13),
+            ],
+        ),
+    },
+)
