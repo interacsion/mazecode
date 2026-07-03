@@ -29,24 +29,28 @@
             error_correction_blocks: [
                 (count: 1, total_codewords: 26, data_codewords: 9),
             ],
+            alignment_pattern_coordinates: [],
         ),
         2: (
             data_codewords: 16,
             error_correction_blocks: [
                 (count: 1, total_codewords: 44, data_codewords: 16),
             ],
+            alignment_pattern_coordinates: [6, 18],
         ),
         3: (
             data_codewords: 26,
             error_correction_blocks: [
                 (count: 2, total_codewords: 35, data_codewords: 13),
             ],
+            alignment_pattern_coordinates: [6, 22],
         ),
         4: (
             data_codewords: 36,
             error_correction_blocks: [
                 (count: 4, total_codewords: 25, data_codewords: 9),
             ],
+            alignment_pattern_coordinates: [6, 26],
         ),
         5: (
             data_codewords: 46,
@@ -54,12 +58,14 @@
                 (count: 2, total_codewords: 33, data_codewords: 11),
                 (count: 2, total_codewords: 34, data_codewords: 12),
             ],
+            alignment_pattern_coordinates: [6, 30],
         ),
         6: (
             data_codewords: 60,
             error_correction_blocks: [
                 (count: 4, total_codewords: 43, data_codewords: 15),
             ],
+            alignment_pattern_coordinates: [6, 34],
         ),
         7: (
             data_codewords: 66,
@@ -67,6 +73,7 @@
                 (count: 4, total_codewords: 39, data_codewords: 13),
                 (count: 1, total_codewords: 40, data_codewords: 14),
             ],
+            alignment_pattern_coordinates: [6, 22, 38],
         ),
         8: (
             data_codewords: 86,
@@ -74,6 +81,7 @@
                 (count: 4, total_codewords: 40, data_codewords: 14),
                 (count: 2, total_codewords: 41, data_codewords: 15),
             ],
+            alignment_pattern_coordinates: [6, 24, 42],
         ),
         9: (
             data_codewords: 100,
@@ -81,6 +89,7 @@
                 (count: 4, total_codewords: 36, data_codewords: 12),
                 (count: 4, total_codewords: 37, data_codewords: 13),
             ],
+            alignment_pattern_coordinates: [6, 26, 46],
         ),
     },
 )

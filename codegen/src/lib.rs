@@ -4,13 +4,13 @@ use quote::quote;
 use serde::Deserialize;
 use syn::{File, parse_quote};
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 pub struct VersionInfo {
     groups: Vec<VersionGroup>,
     versions: BTreeMap<usize, Version>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 struct VersionGroup {
     range: RangeInclusive<usize>,
     numeric_count_indicator_length: usize,
@@ -19,13 +19,14 @@ struct VersionGroup {
     kanji_count_indicator_length: usize,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 struct Version {
     data_codewords: usize,
     error_correction_blocks: Vec<ErrorCorrectionBlock>,
+    alignment_pattern_coordinates: Vec<usize>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 struct ErrorCorrectionBlock {
     count: usize,
     total_codewords: usize,
@@ -101,6 +102,21 @@ pub fn generate(version_info: &VersionInfo) -> File {
                 }
             });
 
+    let version_alignment_pattern_coordinates =
+        version_info
+            .versions
+            .iter()
+            .enumerate()
+            .map(|(index, (number, version))| {
+                assert!(*number == index + 1);
+
+                let alignment_pattern_coordinates = &version.alignment_pattern_coordinates;
+
+                quote! {
+                    &[ #(#alignment_pattern_coordinates),* ]
+                }
+            });
+
     parse_quote! {
         pub struct VersionGroup {
             pub range: std::range::RangeInclusive<super::Version>,
@@ -125,6 +141,10 @@ pub fn generate(version_info: &VersionInfo) -> File {
 
         pub static VERSION_ERROR_CORRECTION_BLOCKS: [&[ErrorCorrectionBlock]; #versions_len] = [
             #(#version_error_correction_blocks),*
+        ];
+
+        pub static VERSION_ALIGNMENT_PATTERN_COORDINATES: [&[usize]; #versions_len] = [
+            #(#version_alignment_pattern_coordinates),*
         ];
     }
 }
