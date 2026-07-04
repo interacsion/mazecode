@@ -8,6 +8,8 @@ anyhow = "1"
 bitvec = "1"
 clap = "4"
 image = { version =  "0.25", features = ["jpeg", "png", "webp", "rayon"], default-features = false }
+itertools = "0.15"
+rand_xoshiro = "0.8"
 
 [build-dependencies]
 mazecode-codegen = { path = "codegen" }

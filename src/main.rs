@@ -9,6 +9,7 @@ use bitvec::{
     view::{AsBits, BitView},
 };
 use image::{ImageBuffer, ImageFormat, Rgba};
+use itertools::Itertools;
 
 use crate::versions::{Version, find_version_with_bit_capacity, version_groups};
 
@@ -124,7 +125,7 @@ fn main() -> Result<()> {
     finder_pattern(&mut grid, version.size(), version.size() - 7, 0);
     finder_pattern(&mut grid, version.size(), 0, version.size() - 7);
 
-    for i in (8..(version.size() - 8)) {
+    for i in 8..(version.size() - 8) {
         grid.set(i + version.size() * 6, i % 2 == 0);
         grid.set(6 + version.size() * i, i % 2 == 0);
     }
@@ -479,4 +480,30 @@ fn display(grid: &BitVec, size: usize) -> Result<()> {
     imgbuf.write_to(&mut fs::File::create("out.png")?, ImageFormat::Png)?;
 
     Ok(())
+}
+
+struct Grid {
+    version: Version,
+    cells: BitVec,
+}
+
+impl Grid {
+    fn get(&self, x: usize, y: usize) -> bool {
+        self.cells[x + y * self.version.size()]
+    }
+
+    fn maze_score(&self) -> i32 {
+        let mut score = 0;
+
+        for (x, y) in (0..self.version.size() - 1).cartesian_product(0..self.version.size() - 1) {
+            if self.get(x, y) != self.get(x + 1, y)
+                && self.get(x, y) != self.get(x, y + 1)
+                && self.get(x, y) == self.get(x + 1, y + 1)
+            {
+                score -= 10;
+            }
+        }
+
+        score
+    }
 }

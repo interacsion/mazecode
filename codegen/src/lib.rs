@@ -118,6 +118,7 @@ pub fn generate(version_info: &VersionInfo) -> File {
             });
 
     parse_quote! {
+        #[derive(Debug)]
         pub struct VersionGroup {
             pub range: std::range::RangeInclusive<super::Version>,
             pub numeric_count_indicator_length: usize,
@@ -134,6 +135,7 @@ pub fn generate(version_info: &VersionInfo) -> File {
             #(#version_data_codewords),*
         ];
 
+        #[derive(Debug)]
         pub struct ErrorCorrectionBlock {
             pub total_codewords: usize,
             pub data_codewords: usize,
