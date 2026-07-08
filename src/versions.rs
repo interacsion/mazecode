@@ -18,6 +18,10 @@ impl Version {
         21 + self.0 * 4
     }
 
+    pub fn data_codewords(&self) -> usize {
+        VERSION_DATA_CODEWORDS[self.0]
+    }
+
     pub fn error_correction_blocks(&self) -> &'static [ErrorCorrectionBlock] {
         VERSION_ERROR_CORRECTION_BLOCKS[self.0]
     }
@@ -31,16 +35,14 @@ pub fn version_groups() -> &'static [VersionGroup] {
     &VERSION_GROUPS
 }
 
-pub fn find_version_with_bit_capacity(
-    bit_len: usize,
+pub fn find_version_with_data_capacity(
+    capacity: usize,
     version_range: RangeInclusive<Version>,
-) -> Option<(Version, usize)> {
+) -> Option<Version> {
     VERSION_DATA_CODEWORDS
         .iter()
         .skip(version_range.start.0)
         .take(version_range.last.0 + 1)
-        .enumerate()
-        .find_map(|(index, codewords)| {
-            (codewords * 8 >= bit_len).then_some((Version(index), codewords * 8))
-        })
+        .position(|&codewords| codewords >= capacity)
+        .map(Version)
 }

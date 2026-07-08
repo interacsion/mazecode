@@ -1,4 +1,4 @@
-use std::{cmp::min, debug_assert_matches, fs};
+use std::{fs, io::{Seek, Write}};
 
 use anyhow::{Result, bail};
 use bitvec::{
@@ -6,12 +6,16 @@ use bitvec::{
     field::BitField,
     order::{Lsb0, Msb0},
     vec::BitVec,
-    view::{AsBits, BitView},
+    view::{AsBits, AsMutBits, BitView},
 };
 use image::{ImageBuffer, ImageFormat, Rgba};
 use itertools::Itertools;
+use rand_xoshiro::{
+    Xoshiro256PlusPlus,
+    rand_core::{Rng, SeedableRng},
+};
 
-use crate::versions::{Version, find_version_with_bit_capacity, version_groups};
+use crate::versions::{Version, find_version_with_data_capacity, version_groups};
 
 mod gf;
 mod versions;
@@ -40,41 +44,20 @@ fn encode_data(raw_data: &[u8]) -> Result<(Vec<u8>, Version)> {
         result.extend_from_bitslice(bits![0, 1, 0, 0]); // byte mode indicator
         result.extend_from_bitslice(data_len_bits);
         result.extend_from_bitslice(raw_data.as_bits::<Msb0>());
-
-        let Some((version, bit_capacity)) =
-            find_version_with_bit_capacity(result.len(), version_group.range)
-        else {
-            continue;
-        };
-
-        let terminator_len = min(4, bit_capacity - result.len());
-        result.resize(result.len() + terminator_len, false);
-
+        result.resize(result.len() + 4, false); // terminator
         debug_assert_eq!(result.len() % 8, 0);
 
-        loop {
-            if result.len() == bit_capacity {
-                break;
-            }
-
-            result.extend_from_bitslice(bits![1, 1, 1, 0, 1, 1, 0, 0]);
-
-            if result.len() == bit_capacity {
-                break;
-            }
-
-            result.extend_from_bitslice(bits![0, 0, 0, 1, 0, 0, 0, 1]);
+        if let Some(version) =
+            find_version_with_data_capacity(result.len() / 8 * 2, version_group.range)
+        {
+            return Ok((result.into_vec(), version));
         }
-
-        return Ok((result.into_vec(), version));
     }
 
     bail!("input data is too long")
 }
 
-fn construct_message(raw_data: &[u8]) -> Result<(Vec<u8>, Version)> {
-    let (data, version) = encode_data(raw_data)?;
-
+fn construct_message(data: &[u8], version: Version) -> Vec<u8> {
     let blocks = version.error_correction_blocks();
 
     let mut data_blocks = Vec::with_capacity(blocks.len());
@@ -113,11 +96,15 @@ fn construct_message(raw_data: &[u8]) -> Result<(Vec<u8>, Version)> {
         }
     }
 
-    Ok((result, version))
+    result
 }
 
-fn main() -> Result<()> {
-    let (data, version) = construct_message(b"https://discord.gg/vestibule")?;
+fn layout_data(data: &[u8], padding: &[u8], version: Version) -> BitVec {
+    let mut buf = Vec::new();
+    buf.extend(data);
+    buf.extend(padding);
+
+    let data = construct_message(&buf, version);
 
     let mut grid = bitvec![0; version.size() * version.size()];
 
@@ -161,7 +148,7 @@ fn main() -> Result<()> {
         }
     }
 
-    debug_assert_matches!(data.next(), None);
+    debug_assert!(data.next().is_none());
 
     // BCH encoded format information
     let format_information = bitvec::bitvec![1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0];
@@ -250,7 +237,62 @@ fn main() -> Result<()> {
         masked_format_information[0],
     );
 
-    display(&grid, version.size())?;
+    grid
+}
+
+fn calculate_score(data: &[u8], padding: &[u8], version: Version) -> i32 {
+    let grid = layout_data(data, padding, version);
+
+    let mut score = 0;
+
+    let get = |x, y| grid[x + y * version.size()];
+
+    for (x, y) in (0..version.size() - 1).cartesian_product(0..version.size() - 1) {
+        if get(x, y) != get(x + 1, y)
+            && get(x, y) != get(x, y + 1)
+            && get(x, y) == get(x + 1, y + 1)
+        {
+            score -= 10;
+        }
+    }
+
+    score
+}
+
+fn main() -> Result<()> {
+    let mut rng = Xoshiro256PlusPlus::seed_from_u64(0);
+
+    let (mut data, version) = encode_data(b"Lorem Ipsum Dolor Sit Amet")?;
+
+    // generate random padding
+    let mut padding = vec![0; version.data_codewords() - data.len()];
+    rng.fill_bytes(&mut padding);
+
+    let grid = layout_data(&data, &padding, version);
+    display(&grid, version.size(), fs::File::create("out1.png")?)?;
+
+    let mut current_score = calculate_score(&data, &padding, version);
+
+    dbg!(current_score);
+
+    while let Some((best_flip, score)) = (0..padding.len() * 8)
+        .map(|i| {
+            *padding.as_mut_bits::<Msb0>().get_mut(i).unwrap() ^= true;
+            let score = calculate_score(&data, &padding, version);
+            *padding.as_mut_bits::<Msb0>().get_mut(i).unwrap() ^= true;
+            (i, score)
+        })
+        .filter(|&(_, score)| score > current_score)
+        .max_by_key(|&(_, score)| score)
+    {
+        *padding.as_mut_bits::<Msb0>().get_mut(best_flip).unwrap() ^= true;
+        current_score = score;
+    }
+
+    dbg!(current_score);
+
+    let grid = layout_data(&data, &padding, version);
+    display(&grid, version.size(), fs::File::create("out2.png")?)?;
 
     Ok(())
 }
@@ -453,7 +495,7 @@ fn alignment_pattern(grid: &mut BitVec, size: usize, x: usize, y: usize) {
 }
 
 /// terrible display implementation
-fn display(grid: &BitVec, size: usize) -> Result<()> {
+fn display(grid: &BitVec, size: usize, mut writer: impl Write + Seek) -> Result<()> {
     let scale = 16;
 
     let mut imgbuf: ImageBuffer<Rgba<u8>, _> =
@@ -477,33 +519,7 @@ fn display(grid: &BitVec, size: usize) -> Result<()> {
         }
     }
 
-    imgbuf.write_to(&mut fs::File::create("out.png")?, ImageFormat::Png)?;
+    imgbuf.write_to(&mut writer, ImageFormat::Png)?;
 
     Ok(())
-}
-
-struct Grid {
-    version: Version,
-    cells: BitVec,
-}
-
-impl Grid {
-    fn get(&self, x: usize, y: usize) -> bool {
-        self.cells[x + y * self.version.size()]
-    }
-
-    fn maze_score(&self) -> i32 {
-        let mut score = 0;
-
-        for (x, y) in (0..self.version.size() - 1).cartesian_product(0..self.version.size() - 1) {
-            if self.get(x, y) != self.get(x + 1, y)
-                && self.get(x, y) != self.get(x, y + 1)
-                && self.get(x, y) == self.get(x + 1, y + 1)
-            {
-                score -= 10;
-            }
-        }
-
-        score
-    }
 }
